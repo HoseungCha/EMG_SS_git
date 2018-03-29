@@ -17,26 +17,19 @@ path_main= 'E:\OneDrive_Hanyang\¿¬±¸\EMG_Silent_Search\ÄÚµå'; % main path
 path_saved = fullfile(path_main,'DB','DB_processed',...
     'len_win_0.1000_SP_win_0.1000'); % saving path
 load(fullfile(path_saved,'feat_set')); % load saved features
-% ºĞ·ù ´Ü¾î ¼±ÅÃ
-idx_word2use = [7,9,12,13,17,20]; %["¼±ÅÃ";"¾Æ·¡";"¿ìÃø";"À§ÂÊ";"ÁÂÃø";"Ãë¼Ò"]
-idx_word2use = [7,20]; %["¼±ÅÃ";"Ãë¼Ò"]
-names_word(idx_word2use)
 % 9¹ø ÇÇÇèÀÚ Á¦°Å
 feat_set(9,:) =[];
 [N_sub, N_trl] = size(feat_set);
 [N_word,~] = size(feat_set{1});
 [N_seg,N_feat] =  size(feat_set{1}{1});
 
-N_word = length(idx_word2use);
 Features = zeros(N_seg,N_feat,N_word,N_trl,N_sub);
 for i_sub = 1 : N_sub
     for i_trl = 1 : N_trl
-        count = 0;
-        for i_word = idx_word2use
-            count = count +1;
+        for i_word = 1 : N_word
             for i_seg = 1 : N_seg
                 for i_feat = 1 : N_feat
-                    Features(i_seg,i_feat,count,i_trl,i_sub) = ...
+                    Features(i_seg,i_feat,i_word,i_trl,i_sub) = ...
                         feat_set{i_sub,i_trl}{i_word}(i_seg,i_feat);  
                 end
             end
@@ -93,7 +86,7 @@ for N_wordatpair = 4  % choose numbe of feature pairs. % Âü°í: feature 4°³ »ç¿ëÇ
         % train DB¸¦ 20°¡ÁöÁß¿¡ ¼±ÅÃÇÒ ¶§, ·£´ıÇÏ°Ô ¼±ÅÃ ÃÑ ¹İº¹È½¼ö Á¤ÇÏ±â
         load('pairset_new.mat'); 
         
-        for n_pair = 5;
+        for n_pair = 10;
         pair = pairset_new{n_pair};
         % get indices of trials
         Idx_trial = 1 : N_trl;
@@ -197,7 +190,7 @@ for N_wordatpair = 4  % choose numbe of feature pairs. % Âü°í: feature 4°³ »ç¿ëÇ
 %         pred_n_label__{i_sub} = pred_n_label_;
         end
         
-        for n_seg = N_seg
+        for n_seg = 1: N_seg
             pred_n_label_vec = cat(1,pred_n_label{n_seg,:,:});
             outputs = full(ind2vec(pred_n_label_vec(:,1)',N_word));
             targets = full(ind2vec(pred_n_label_vec(:,2)',N_word));
@@ -205,7 +198,7 @@ for N_wordatpair = 4  % choose numbe of feature pairs. % Âü°í: feature 4°³ »ç¿ëÇ
 %             plotconfusion(targets,outputs,names_word)
             [c,cm,ind,per] = confusion(targets,outputs);
             figure;
-            plotConfMat(cm, names_word(idx_word2use))
+            plotConfMat(cm, names_word)
         end
         end
 %         save(fullfile(cd,'result',[temp_str,'._FearR_mat']),'acc','pred','fin_pred');

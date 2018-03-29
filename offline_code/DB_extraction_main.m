@@ -68,8 +68,6 @@ for i_sub= 1 : N_subject
         %% EMG BDF read
         fname = [Spath{i_sub},'\',num2str(i_trl),'.bdf'];
         OUT = pop_biosig(fname);
-        
-       
             
             %% EMG channel (only lower part, which is why lip
             % movements are not relevant with upper EMG)
@@ -99,7 +97,7 @@ for i_sub= 1 : N_subject
             [emg_win,trg_w] = getWindows(emg_data,p.winsize,p.wininc,[],[],p.trg(:,1));
             fname = sprintf('sub_%03d_trl_%03d',i_sub,i_trl);
             
-            %% trg_w를 기준으로 3초 windows 추출
+            %% trg_w를 기준으로 2초 windows 추출(20
             feat_wins = cell(length(trg_w),1);
             for i = 1 : length(trg_w)
                 temp_wins = emg_win(trg_w(i):trg_w(i)+p.windows-1,:);
