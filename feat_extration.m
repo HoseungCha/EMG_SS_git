@@ -123,18 +123,15 @@ for i_sub= 1 : n_sub
         
         % get raw data and bipolar configuration        
         data_bip.RZ= out.data(idx_pair_right(i_comb,1),:) - out.data(idx_pair_right(i_comb,2),:);%Right_Zygomaticus
-        data_bip.LZ= out.data(idx_pair_left(i_comb,1),:) - out.data(idx_pair_left(i_comb,2),:); %Right_Zygomaticus
+        data_bip.LZ= out.data(idx_pair_left(i_comb,1),:) - out.data(idx_pair_left(i_comb,2),:); %LEFT_Zygomaticus
         data_bip = double(cell2mat(struct2cell(data_bip)))';
         clear out;
         % Filtering
         data_filtered = filter(fp.nb, fp.na, data_bip,[],1);
         data_filtered = filter(fp.bb, fp.ba, data_filtered, [],1);
         clear data_bip;
-        % for plot
-%         figure;plot(filtered_data)
+
         % Feat extration with windows 
-        
-%         wininc = floor(0.05*SF2use); 
         n_win = floor((length(data_filtered) - n_winsize)/n_wininc)+1;
         temp_feat = zeros(n_win,n_feat); idx_trg_as_window = zeros(n_win,1);
         st = 1;
@@ -146,8 +143,8 @@ for i_sub= 1 : n_sub
             temp_CC = featCC(curr_win,n_ch);
             temp_WL = sum(abs(diff(curr_win,2)));
             temp_SampEN = SamplEN(curr_win,2);
-%             temp_feat(i,:) = [temp_CC,temp_rms,temp_SampEN,temp_WL];
             temp_feat(i,:) = [temp_rms,temp_WL,temp_SampEN,temp_CC];
+            
             % moving widnow
             st = st + n_wininc;
             en = en + n_wininc;                 
