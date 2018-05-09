@@ -24,14 +24,15 @@ name_DB_analy = 'feat_set_DB_raw_n_sub_2_n_wininc_204_winsize_204';
 name_feat_file = 'feat_set_speech';
 
 % decide types of features to extract
-str_features2use = {'RMS','Min_Max','Teager','Hjorth'};
+% str_features2use = {'RMS','Min_Max','Teager','Hjorth'};
+str_features2use = {'RMS'};
 
 
 % decide indices of words to classify
-% names_words2use = ["Home";"Back";"Recents";"Volume";"Brightness";...
-%     "Settings";"Wifi";"Bluetooth";"Vibrate";"Sound";"up";"down";"left";...
-%     "right";"Alarms";"Timers";"Music";"Navigate";"Ok Google";"Hey Siri"];
-names_words2use= ["Home";"Back";"up";"down";"left";"right"];
+names_words2use = ["Silence";"Home";"Back";"Recents";"Volume";"Brightness";...
+    "Settings";"Wifi";"Bluetooth";"Vibrate";"Sound";"up";"down";"left";...
+    "right";"Alarms";"Timers";"Music";"Navigate";"Ok Google";"Hey Siri"];
+% names_words2use= ["up";"down";"left";"right"];
 
 % decide number of tranfored feat from DB 
 n_transforemd = 0;
@@ -141,7 +142,7 @@ r.output_n_target = cell(n_trl,n_sub,N_train,n_transforemd+1);
 % get accrucies and output/target (for confusion matrix) with respect to
 % subject, trial, number of segment, FE,
 for i_sub = 1 : n_sub
-    for n_train = 5 : N_train
+    for n_train = 10 : N_train
     for i_trl = 1 : n_trl
         % get indices of trial for training set
         idx_trl_tr = idx_pair_set{n_train}(i_trl,:);
@@ -241,7 +242,7 @@ for i_sub = 1 : n_sub
             
             % feat for anlaysis
             feat_ref = reshape(permute(feat(idx_feat2use,:,idx_trl_tr,i_sub),...
-                [1 4 3 2]),[n_train*n_fe,n_feat2use]);
+                [3 2 1]),[n_train*n_fe,n_feat2use]);
             target_feat_ref = repmat(1:n_fe,n_train,1);
             target_feat_ref = target_feat_ref(:);
             
@@ -252,16 +253,18 @@ for i_sub = 1 : n_sub
             % get input and targets for test DB
             input_test = reshape(permute(feat(idx_feat2use,...
                 :,countmember(idx_trl,idx_trl_tr)==0,...
-                i_sub),[1 4 3 2]),[(n_trl-n_train)*n_fe,n_feat2use]);
+                i_sub),[3 2 1]),[(n_trl-n_train)*n_fe,n_feat2use]);
             target_test = repmat(1:n_fe,(n_trl-n_train),1);
             target_test = target_test(:);
             
             % get features of determined emotions that you want to classify
-            idx_train_samples_2_classify = countmember(target_train,idx_word2classfy)==1;
+            idx_train_samples_2_classify = countmember(target_train,...
+                idx_word2classfy)==1;
             input_train = input_train(idx_train_samples_2_classify,:);
             target_train = target_train(idx_train_samples_2_classify,:);
             
-            idx_test_samples_2_classify = countmember(target_test,idx_word2classfy)==1;
+            idx_test_samples_2_classify = countmember(target_test,...
+                idx_word2classfy)==1;
             input_test = input_test(idx_test_samples_2_classify,:);
             target_test = target_test(idx_test_samples_2_classify,:);
             
@@ -301,8 +304,6 @@ save(fullfile(path_saving,sprintf('r.mat')),'r');
 tmp = struct2cell(r);
 tmp = tmp{1};
 acc_mean_sub_trl = permute(mean(mean(tmp(:,:,5:10),1),2),[3 1 2]);
-figure;
-plot(acc_mean_sub_trl);
 %--------------save
 save(fullfile(path_saving,sprintf('acc_mean_sub_trl.mat')),...
     'acc_mean_sub_trl');

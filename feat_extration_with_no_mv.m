@@ -64,6 +64,7 @@ n_ch_config = length(name_ch_config);
 % struct 2 cell
 idx_ch_config = struct2cell(idx_ch_config);
 
+
 %-----------------------set feature indices-------------------------------%
 % feature list which was extracted in feat_extraction.m
 name_feat_list = {'RMS','WL','CC','SampEN','Min_Max','Teager','Hjorth'};
@@ -80,6 +81,8 @@ idx_ftype2use = find(contains(name_feat_list,str_features2use)==1);
 % number of feature types to be used in this code
 n_ftype2use = length(idx_ftype2use==1);
 
+% number of channels
+n_ch = cell(n_ch_config,1);
 % indices of EMG pair
 idx_bp_pair = cell(n_ch_config,1);
 
@@ -94,23 +97,27 @@ n_feat2use = cell(n_ch_config,1);
 
 % set number and indices of features of each channel configureation
 for i_ch_config = 1 : n_ch_config
+% number of channel    
+n_ch{i_ch_config} = length(idx_ch_config{i_ch_config});
+
 % indices of EMG pair
-idx_bp_pair{i_ch_config} = nchoosek(1:length(idx_ch_config{i_ch_config}),2);
+idx_bp_pair{i_ch_config} = nchoosek(1:n_ch{i_ch_config},2);
 
 % number of bipolar pairs of each channel configuration
 n_bp{i_ch_config} = length(idx_bp_pair{i_ch_config});
 
 n_feat2use{i_ch_config} = sum(v_multply_of_feat(idx_ftype2use)*...
-    n_bp{i_ch_config});
+    (n_ch{i_ch_config}+n_bp{i_ch_config}));
 
 temp = cell(n_ftype,1);
 for i_feat_type = 1 : n_ftype
     temp{i_feat_type} = i_feat_type*ones(v_multply_of_feat(i_feat_type)*...
-        n_bp{i_ch_config},1);
+        (n_ch{i_ch_config}+n_bp{i_ch_config}),1);
 end
 idx_feat2use{i_ch_config}  = cell(n_ftype2use,1);
 for i_feat_type = 1 : n_ftype2use
-    idx_feat2use{i_ch_config}{i_feat_type} = find(idx_ftype2use(i_feat_type)==cat(1,temp{:}));
+    idx_feat2use{i_ch_config}{i_feat_type} = ...
+        find(idx_ftype2use(i_feat_type)==cat(1,temp{:}));
 end
 end      
 %-------------------------------------------------------------------------%
@@ -172,15 +179,15 @@ for i_sub = 1 : n_sub
         %Trigger latency ¹× FE ¶óº§
         temp = cell2mat(permute(struct2cell(out.event),[1 3 2]))';
         temp(:,1) = temp(:,1)./128;
-        
         % first get rid of speech onset trg
         idx_speech_trg = temp(:,1)==0.5;
         idx_speech_onset = temp(idx_speech_trg,:);
         temp(idx_speech_trg,:) = [];
         
-        lat_trg = temp(1:2:n_word*2,2);
+        lat_trg = temp(2:2:n_word*2,2);
         
         Idx_trg_obtained = reshape(temp(:,1),[2,n_word*2/2])';
+        disp(Idx_trg_obtained);
         [~,idx_in_order] = sortrows(Idx_trg_obtained);
 
         temp = sortrows([idx_in_order,(1:length(idx_in_order))'],1); 
@@ -189,14 +196,45 @@ for i_sub = 1 : n_sub
         
         %select trg of speech onset to use
         lat_trg_speech = zeros(n_word,1);
-        for i = 1 : n_word
-            lat_trg_speech(i) = idx_speech_onset(...
-                find(idx_speech_onset(:,2)>lat_trg(i),1),2);
-        end      
+        for i_word = 1 : n_word
+            if i_word == 1
+                % during silent, use the trigger of instruction
+                lat_trg_speech(i_word) = lat_trg(i_word);
+            elseif i_word == n_word
+                % during last word, campare only previous trigger of instruction
+                idx_speech_onset_between_trg = ...
+                find((idx_speech_onset(:,2)>lat_trg(i_word))==1);   
+            else
+                % during other words, compare triggers between instructions
+            	idx_speech_onset_between_trg = ...
+                    find((idx_speech_onset(:,2)>lat_trg(i_word)).*...
+                    (idx_speech_onset(:,2)<lat_trg(i_word+1))==1);
+            end
+            % get first trg of speech onsets
+            try
+            if lat_trg_speech(i_word) == 0
+                lat_trg_speech(i_word) = idx_speech_onset(...
+                    idx_speech_onset_between_trg(1),2);
+            end
+            id_skip = 0;
+            catch ex
+                % save NaN data for data consistency 
+                % when trigger was not properly acquired
+                if strcmp(ex.identifier,'MATLAB:badsubscript')
+                    lat_trg_speech(i_word) = NaN;
+                    id_skip = 1;
+                    features(:,:,c_trl,:) = NaN(size(features(:,:,c_trl,:)));
+                    break;
+                end
+            end
+        end  
+        if id_skip == 1
+            continue;
+        end
         %-----------------------------------------------------------------%
         
         % extract the data with channles position you get(VR, Speech)
-        data_2_use = out.data(idx_ch_config{i_ch_config},:);
+        data_2_use = double(out.data(idx_ch_config{i_ch_config},:));
         
         %get possible data from bipolar electrode configuration     
         data_bip = cell(n_bp{i_ch_config},1);
@@ -205,14 +243,16 @@ for i_sub = 1 : n_sub
                 data_2_use(idx_bp_pair{i_ch_config}(i_pair_ch,1),:) - ...
                 data_2_use(idx_bp_pair{i_ch_config}(i_pair_ch,2),:);
         end
-        data_bip = double(cell2mat(data_bip))';
-
-        clear out data_2_use;
+        data_bip = (cell2mat(data_bip))';
+        
+        % concatinate unipolar and bipolar channels
+        data_c = [data_2_use',data_bip];
+        clear out data_2_use data_bip;
         
         % filtering
-        data_filtered = filter(fp.nb, fp.na, data_bip,[],1);
+        data_filtered = filter(fp.nb, fp.na, data_c,[],1);
         data_filtered = filter(fp.bb, fp.ba, data_filtered, [],1);
-        clear data_bip;
+        clear data_c;
         
         %----------------------get triggers of windows------------------%
         n_win = floor((length(data_filtered) - n_winsize)/n_wininc)+1;
@@ -237,7 +277,8 @@ for i_sub = 1 : n_sub
         idx_trg_start = zeros(n_word,1);
         for i_emo_orer_in_this_exp = 1 : n_word
             idx_trg_start(i_emo_orer_in_this_exp,1) =...
-                find(idx_trg_as_window >= lat_trg_speech(i_emo_orer_in_this_exp),1);
+                find(idx_trg_as_window >= ...
+                lat_trg_speech(i_emo_orer_in_this_exp),1);
         end        
 
        %---------------------construct features---------------------------%
@@ -245,7 +286,8 @@ for i_sub = 1 : n_sub
        % [n_feat,n_fe,n_trl,n_sub,n_comb]
         for i_emo_orer_in_this_exp = 1 : n_word
             % get EMG during period of word pronuciation
-            tmp = emg_win(idx_trg_start(i_emo_orer_in_this_exp):...
+            tmp = emg_win(idx_trg_start(i_emo_orer_in_this_exp)...
+                -floor((period_word2clsy*fp.SF2use)/n_wininc)+1:...
                         idx_trg_start(i_emo_orer_in_this_exp)...
                         +floor((period_word2clsy*fp.SF2use)/n_wininc)-1 ,:);
             tmp = cell2mat(tmp);
@@ -293,10 +335,10 @@ for i = 1 : n_ch
     temp_teager(i) = sum(tmp)/length(tmp);
 end
 % HJORTH PARAMETERS
-temp_Hjorth = zeros(1,n_ch*3);
-for i = 1 : n_ch
-    temp_Hjorth(3*(i-1)+1:3*i) = HjorthParameters(curr_win(:,i));
-end
+temp_activity = var(curr_win);
+temp_mobility = sqrt(var(diff(curr_win))./var(curr_win));
+temp_complexity = sqrt(var(diff(diff(curr_win)))./var(diff(curr_win)));
+temp_Hjorth = [temp_activity,temp_mobility,temp_complexity];
 
 % concatinating features
 temp_feat = [temp_rms,temp_WL,temp_SampEN,temp_CC,...

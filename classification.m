@@ -18,20 +18,21 @@ name_DB_raw = 'DB_raw';
 name_DB_process = 'DB_processed';
 
 % name of anlaysis DB in the process DB
-name_DB_analy = 'feat_set_DB_raw_n_sub_2_n_wininc_204_winsize_204';
+name_DB_analy = 'feat_set_DB_raw_n_sub_2_n_seg_15_n_wininc_204_winsize_204';
 
 % name of feature to be loaded
-name_feat_file = 'feat_set_speech';
+name_feat_file = 'feat_set_12910_RMS';
 
 % decide types of features to extract
-str_features2use = {'RMS','Min_Max','Teager','Hjorth'};
+% str_features2use = {'RMS','Min_Max','Teager','Hjorth'};
+str_features2use = {'RMS'};
 
 
 % decide indices of words to classify
-% names_words2use = ["Home";"Back";"Recents";"Volume";"Brightness";...
-%     "Settings";"Wifi";"Bluetooth";"Vibrate";"Sound";"up";"down";"left";...
-%     "right";"Alarms";"Timers";"Music";"Navigate";"Ok Google";"Hey Siri"];
-names_words2use= ["Home";"Back";"up";"down";"left";"right"];
+names_words2use = ["Silence";"Home";"Back";"Recents";"Volume";"Brightness";...
+    "Settings";"Wifi";"Bluetooth";"Vibrate";"Sound";"up";"down";"left";...
+    "right";"Alarms";"Timers";"Music";"Navigate";"Ok Google";"Hey Siri"];
+% names_words2use= ["Silence";"Home"];
 
 % decide number of tranfored feat from DB 
 n_transforemd = 0;
@@ -73,7 +74,7 @@ name_feat_list = getfield(tmp,tmp_name{3}); %#ok<GFLD>
 
 %-----------------------experiment information----------------------------%
 % DB infromation
-[n_feat, n_fe, n_trl, n_sub] = size(feat); % DB to be analyzed
+[n_seg, n_feat, n_fe, n_trl, n_sub] = size(feat); % DB to be analyzed
 
 % names of subjects
 [name_subject,~] = read_names_of_file_in_folder(path_DB_raw);
@@ -87,13 +88,14 @@ names_words = ["Silence";"Home";"Back";"Recents";"Volume";"Brightness";...
 idx_word2classfy = find(contains(names_words,names_words2use)==1);
 n_word2classfy = length(idx_word2classfy);
 names_word2classfy = names_words(idx_word2classfy);
+n_class = length(names_word2classfy);
 %-------------------------------------------------------------------------%
 
 %------------------------analysis paramters-------------------------------%
 % type of train-less algorithm 
 id_DBtype = 'DB_own'; 
 
-N_train = 10;
+N_train = 5;
 
 % load pair set
 tmp = load('pairset_new.mat');
@@ -103,6 +105,7 @@ idx_pair_set = tmp.pairset_new;
 idx_sub = 1 : n_sub;
 idx_trl = 1 : n_trl;
 n_sub_compared = n_sub - 1;
+
 
 
 %-----------------------set feature indices-------------------------------%
@@ -118,7 +121,30 @@ idx_ftype2use = find(contains(name_feat_list,str_features2use)==1);
 idx_feat2use = cat(1,idx_feat{idx_ftype2use});
 n_feat2use = length(idx_feat2use);
 %-------------------------------------------------------------------------%
+
+%-----------------------NN architecture parameters------------------------%
+n_inputSize = n_feat2use;
+n_HiddenUnits = 100;
+layers = [ ...
+    sequenceInputLayer(n_inputSize)
+    bilstmLayer(n_HiddenUnits,'OutputMode','last')
+    fullyConnectedLayer(n_class)
+    softmaxLayer
+    classificationLayer];
+n_maxEpochs = 100;
+% n_miniBatchSize = 27;
+
+options = trainingOptions('adam', ...
+    'ExecutionEnvironment','gpu', ...
+    'GradientThreshold',1, ...
+    'MaxEpochs',n_maxEpochs, ...
+    'SequenceLength','longest', ...
+    'Shuffle','never', ...
+    'Verbose',1);
+% , ...
+%     'Plots','training-progress');
 %-------------------------------------------------------------------------%
+
 
 %---------------------- set folder for saving ----------------------------%
 name_folder_saving = [name_feat_file,'_',id_DBtype,...
@@ -141,7 +167,7 @@ r.output_n_target = cell(n_trl,n_sub,N_train,n_transforemd+1);
 % get accrucies and output/target (for confusion matrix) with respect to
 % subject, trial, number of segment, FE,
 for i_sub = 1 : n_sub
-    for n_train = 5 : N_train
+    for n_train = 1: N_train
     for i_trl = 1 : n_trl
         % get indices of trial for training set
         idx_trl_tr = idx_pair_set{n_train}(i_trl,:);
@@ -240,9 +266,9 @@ for i_sub = 1 : n_sub
             end
             
             % feat for anlaysis
-            feat_ref = reshape(permute(feat(idx_feat2use,:,idx_trl_tr,i_sub),...
-                [1 4 3 2]),[n_train*n_fe,n_feat2use]);
-            target_feat_ref = repmat(1:n_fe,n_train,1);
+            feat_ref = reshape(permute(feat(:,idx_feat2use,:,idx_trl_tr,i_sub),...
+                [1 4 3 2]),[n_seg*n_train*n_fe,n_feat2use]);
+            target_feat_ref = repmat(1:n_fe,n_seg*n_train,1);
             target_feat_ref = target_feat_ref(:);
             
             % get input and targets for train DB
@@ -250,112 +276,147 @@ for i_sub = 1 : n_sub
             target_train = cat(1,target_feat_ref,target_feat_trans);
 
             % get input and targets for test DB
-            input_test = reshape(permute(feat(idx_feat2use,...
+            input_test = reshape(permute(feat(:,idx_feat2use,...
                 :,countmember(idx_trl,idx_trl_tr)==0,...
-                i_sub),[1 4 3 2]),[(n_trl-n_train)*n_fe,n_feat2use]);
-            target_test = repmat(1:n_fe,(n_trl-n_train),1);
+                i_sub),[1 4 3 2]),[n_seg*(n_trl-n_train)*n_fe,n_feat2use]);
+            target_test = repmat(1:n_fe,n_seg*(n_trl-n_train),1);
             target_test = target_test(:);
             
             % get features of determined emotions that you want to classify
-            idx_train_samples_2_classify = countmember(target_train,idx_word2classfy)==1;
+            idx_train_samples_2_classify = countmember(target_train,...
+                idx_word2classfy)==1;
             input_train = input_train(idx_train_samples_2_classify,:);
             target_train = target_train(idx_train_samples_2_classify,:);
             
-            idx_test_samples_2_classify = countmember(target_test,idx_word2classfy)==1;
+            idx_test_samples_2_classify = countmember(target_test,...
+                idx_word2classfy)==1;
             input_test = input_test(idx_test_samples_2_classify,:);
             target_test = target_test(idx_test_samples_2_classify,:);
             
-            % train
-            model.lda = fitcdiscr(input_train,target_train);
+            %----------------------train----------------------------------%
+%             model.svm = fitcsvm(input_train,target_train); 
+%             model.lda = fitcdiscr(input_train,target_train);
+            tmp = (permute(reshape(input_train,...
+                [n_seg,n_train,n_word2classfy,n_feat2use]),[4 1 2 3]));
+            tmp = mat2cell(tmp(:,:,:),...
+                n_feat2use,n_seg,ones(n_train*n_word2classfy,1));
+            input_train = tmp(:);
+            target_train = repmat(idx_word2classfy',[n_train,1]);
+            target_train = categorical(target_train(:));
+            net = trainNetwork(input_train,target_train,layers,options);
+            %-------------------------------------------------------------%
             
-            % test
-            output_test = predict(model.lda,input_test);
+            %--------------------test-------------------------------------%
+            tmp = (permute(reshape(input_test,...
+                [n_seg,(n_trl-n_train),n_word2classfy,n_feat2use]),[4 1 2 3]));
+            tmp = mat2cell(tmp(:,:,:),...
+                n_feat2use,n_seg,ones((n_trl-n_train)*n_word2classfy,1));
+            input_test = tmp(:);
+            target_test = repmat(idx_word2classfy',[(n_trl-n_train),1]);
+            target_test = categorical(target_test(:));
+%             [C, scores] = predict(model.svm, input_test);
+%             output_test = predict(model.lda,input_test);
+            
+%             YPred = classify(net,input_test, ...
+%                 'MiniBatchSize',n_miniBatchSize, ...
+%                 'SequenceLength','longest');
+            output_test = classify(net,input_test, ...
+                'SequenceLength','longest');
+            
+            r.acc(i_trl,i_sub,n_train,n_t+1) = ...
+            sum(output_test==target_test)/...
+            (n_word2classfy*(n_trl-n_train))*100;
+            fprintf('ACCURUCY: %0.2f\n',...
+                r.acc(i_trl,i_sub,n_train,n_t+1));
+            r.output_n_target{i_trl,i_sub,n_train,n_t+1} = ...
+            [output_test,target_test];            
             
             % reshape ouput_test as <seg, trl, FE>
-%             output_test = reshape(output_test,[(n_trl-n_train),n_word2classfy]);
+%             output_test = reshape(output_test,[n_seg,(n_trl-n_train),...
+%                 n_word2classfy]);
 %             output_mv_test = majority_vote(output_test,idx_word2classfy);
-            
-            % reshape target test for acc caculation
-            target_test = repmat(idx_word2classfy,(n_trl-n_train),1);
-            target_test = target_test(:);
-            
-%             ouput_seg = output_test(i_seg,:)';
-            r.acc(i_trl,i_sub,n_train,n_t+1) = ...
-                sum(target_test==output_test)/...
-                (n_word2classfy*(n_trl-n_train))*100;
-            r.output_n_target{i_trl,i_sub,n_train,n_t+1} = ...
-                [output_test,target_test];
+%             
+%             % reshape target test for acc caculation
+%             target_test = repmat(idx_word2classfy,(n_trl-n_train),1);
+%             target_test = target_test(:);
+%           
+%             for i_seg = 1 : n_seg
+%                 ouput_seg = output_test(i_seg,:)';
+%                 r.acc(i_seg,i_trl,i_sub,n_train,n_t+1) = ...
+%                     sum(target_test==ouput_seg)/...
+%                     (n_word2classfy*(n_trl-n_train))*100;
+%                 r.output_n_target{i_seg,i_trl,i_sub,n_train,n_t+1} = ...
+%                     [ouput_seg,target_test];
+%             end
         end
     end
     end
 end
 %--------------------------------main end---------------------------------%
 
-
-
 %------------------------results------------------------------------------%
 save(fullfile(path_saving,sprintf('r.mat')),'r');
 %-------------------------------------------------------------------------%
 
 %--------------averge of accuracies with subjects and trials--------------%
-tmp = struct2cell(r);
-tmp = tmp{1};
-acc_mean_sub_trl = permute(mean(mean(tmp(:,:,10),1),2),[1 4 2 3]);
-figure;
-plot(acc_mean_sub_trl);
+
+acc_mean_sub_n_trl = permute(mean(r.acc(:,:,:),1),[3 2 1]);
 %--------------save
-save(fullfile(path_saving,sprintf('acc_mean_sub_trl.mat')),...
-    'acc_mean_sub_trl');
+save(fullfile(path_saving,sprintf('acc_mean_sub_n_trl.mat')),...
+    'acc_mean_sub_n_trl');
 
 % plot of that acc
-plot(acc_mean_sub_trl)
+bar(acc_mean_sub_n_trl)
 %--------------save fig
-savefig(gcf,fullfile(path_saving,sprintf('acc_mean_sub_trl.fig')))
+savefig(gcf,fullfile(path_saving,sprintf('acc_mean_sub_n_trl.fig')))
 close;
 %-------------------------------------------------------------------------%
 
 %-----------------averge of accuracies with nd trials---------------------%
-acc_mean_trl = mean(r.acc(15,:,:,:),2);
-
+acc_mean_n_trl = permute(mean(mean(r.acc(:,:,:),1),2),[3 2 1]);
 
 %--------------save
-save(fullfile(path_saving,sprintf('acc_mean_trl.mat')),...
-    'acc_mean_trl');
+save(fullfile(path_saving,sprintf('acc_mean_n_trl.mat')),...
+    'acc_mean_n_trl');
 
 % plot of that acc
 figure;
-bar(tmp(:))
+bar(acc_mean_n_trl)
 %--------------save fig
-savefig(gcf,fullfile(path_saving,sprintf('acc_mean_trl.fig')))
+savefig(gcf,fullfile(path_saving,sprintf('acc_mean_n_trl.fig')))
 close;
 %-------------------------------------------------------------------------%
 
 
 %---------------------confusion matrix -----------------------------------%
-tmp = r.output_n_target(15,:,2,:);
+for n_train = 1 : N_train
+tmp = r.output_n_target(:,:,n_train);
 tmp = cat(1,tmp{:});
+% categorical 2 double
+tmp = idx_word2classfy(tmp);
 
 output_tmp = full(ind2vec(tmp(:,1)'));
 target_tmp = full(ind2vec(tmp(:,2)'));
 
 tmp = countmember(1:max(idx_word2classfy),idx_word2classfy)==0;
+
+% get rid of classes which you do not use
 output_tmp(tmp,:) = [];
 target_tmp(tmp,:) = [];
 
+% compute confusion
 [~,mat_conf,idx_of_samps_with_ith_target,~] = ...
     confusion(target_tmp,output_tmp);
-
-% mat_n_samps = cellfun(@(x) size(x,2),idx_of_samps_with_ith_target);
-% xxx = mat_n_samps(logical(eye(size(mat_n_samps))));
-
-%--------------save
-save(fullfile(path_saving,sprintf('confusion.mat')),...
-    'mat_conf','idx_of_samps_with_ith_target','names_exp2classfy');
-
 % plot of that acc
 figure;
 plotConfMat(mat_conf, names_word2classfy)
+
 %--------------save fig
-savefig(gcf,fullfile(path_saving,sprintf('confusion.fig')))
+savefig(gcf,fullfile(path_saving,sprintf('confusion_train-%d.fig',n_train)))
 close;
+
+%--------------save
+save(fullfile(path_saving,sprintf('confusion_train-%d.mat',n_train)),...
+    'mat_conf','idx_of_samps_with_ith_target','names_word2classfy');
+end
 %-------------------------------------------------------------------------%
