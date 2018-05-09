@@ -20,7 +20,7 @@ period_winsize = 0.1;
 
 % decide types of features to extract
 % name_feat2use = {'RMS','WL','CC','SampEN','Min_Max','Teager','Hjorth'};
-name_feat2use = {'Teager'};
+name_feat2use = {'RMS'};
 
 % decide channel to be used
 idx_ch_config = [11:17];
@@ -34,7 +34,7 @@ idx_ch_config = [11:17];
 %-------------------------------------------------------------------------%
 
 %-------------set paths in compliance with Cha's code structure-----------%
-path_research = fileparts(fileparts(fileparts(fullfile(cd))));
+% path_research = fileparts(fileparts(fileparts(fullfile(cd))));
 path_code = fileparts(fullfile(cd));
 path_DB = fullfile(path_code,'DB');
 path_DB_raw = fullfile(path_DB,name_DB_raw);
@@ -42,7 +42,7 @@ path_DB_process = fullfile(path_DB,name_DB_process);
 %-------------------------------------------------------------------------%
 
 %-------------------------add functions-----------------------------------%
-addpath(genpath(fullfile(path_research,'_toolbox')));
+% addpath(genpath(fullfile(path_research,'_toolbox')));
 addpath(genpath(fullfile(cd,'functions')));
 %-------------------------------------------------------------------------%
 

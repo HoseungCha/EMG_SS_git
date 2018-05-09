@@ -1,6 +1,6 @@
 %-------------------------------------------------------------------------%
 % 1. feat_extraction.m
-% 2. classficiation_using_DB.m  %---current code---%
+% 2. classification_simple.m  %---current code---%
 %-------------------------------------------------------------------------%
 % developed by Ho-Seung Cha, Ph.D Student,
 % CONE Lab, Biomedical Engineering Dept. Hanyang University
@@ -8,7 +8,7 @@
 % All rights are reserved to the author and the laboratory
 % contact: hoseungcha@gmail.com
 %-------------------------------------------------------------------------%
-clc; close all; clear all;
+clc; close all; clear;
 
 %-----------------------Code anlaysis parmaters----------------------------
 % name of raw DB
@@ -30,11 +30,6 @@ name_feat_file = 'feat_set_11121314151617_RMS';
 names_words2use = ["Home";"Back";"Recents";"Volume";...
     "Wifi";"Bluetooth";"Vibrate";"Sound";"up";"down";"left";...
     "right";"Alarms";"Navigate";"Ok Google"];
-
-% decide which attibute to be compared when applying train-less algoritm
-% [n_seg:30, n_feat:28, n_fe:8, n_trl:20, n_sub:30]
-% 'all' : [:,:,:,:,:], 'Only_Seg' : [i_seg,:,:,:,:], 'Seg_FE' : [i_seg,:,i_FE,:,:]
-% id_att_compare = 'Only_Seg'; % 'all', 'Only_Seg', 'Seg_FE'
 %-------------------------------------------------------------------------%
 
 %-------------set paths in compliance with Cha's code structure-----------%
@@ -47,7 +42,6 @@ path_DB = fullfile(path_code,'DB');
 path_DB_raw = fullfile(path_DB,name_DB_raw);
 path_DB_process = fullfile(path_DB,name_DB_process);
 path_DB_analy = fullfile(path_DB_process,name_DB_analy);
-
 %-------------------------------------------------------------------------%
 
 %-------------------------add functions-----------------------------------%
@@ -82,7 +76,7 @@ n_word2classfy = length(idx_word2classfy);
 names_word2classfy = names_words(idx_word2classfy);
 %-------------------------------------------------------------------------%
 
-%------------------------analysis paramters-------------------------------%
+%-------------------------------- paramters-------------------------------%
 % type of train-less algorithm
 id_DBtype = 'DB_own';
 
@@ -96,19 +90,6 @@ idx_pair_set = tmp.pairset_new;
 idx_sub = 1 : n_sub;
 idx_trl = 1 : n_trl;
 n_sub_compared = n_sub - 1;
-
-%-----------------------set feature indices-------------------------------%
-% number of feature types
-% n_ftype = length(name_feat_list);
-
-% value which should be multiplied by EMG channel
-% v_multply_of_feat = [1 1 1 4 1 1 3];
-
-% idices of feature types to be used in this code
-% idx_ftype2use = find(contains(name_feat_list,str_features2use)==1);
-
-% idx_feat2use = cat(1,idx_feat{idx_ftype2use});
-% n_feat2use = length(idx_feat2use);
 %-------------------------------------------------------------------------%
 
 %-----------------------NN architecture parameters------------------------%
@@ -224,7 +205,7 @@ for i_sub = 1 : n_sub
             output_test = classify(net,input_test, ...
                 'SequenceLength','longest');
             
-            %--------------------saving-----------------------------------%
+            %--------------------save results-----------------------------%
             r.acc(i_trl,i_sub,n_train) = ...
                 sum(output_test==target_test)/...
                 (n_word2classfy*(n_trl-n_train))*100;
@@ -233,6 +214,7 @@ for i_sub = 1 : n_sub
             r.output_n_target{i_trl,i_sub,n_train} = ...
                 [output_test,target_test];
             r.net{i_trl,i_sub,n_train} = net;
+            %-------------------------------------------------------------%
         end
     end
 end
@@ -243,25 +225,20 @@ save(fullfile(path_saving,sprintf('r.mat')),'r');
 %-------------------------------------------------------------------------%
 
 %--------------averge of accuracies with subjects and trials--------------%
-
-acc_mean_sub_n_trl = permute(mean(r.acc(:,:,:),1),[3 2 1]);
-%--------------save
-save(fullfile(path_saving,sprintf('acc_mean_sub_n_trl.mat')),...
-    'acc_mean_sub_n_trl');
-
 % plot of that acc
 bar(acc_mean_sub_n_trl)
 %--------------save fig
 savefig(gcf,fullfile(path_saving,sprintf('acc_mean_sub_n_trl.fig')))
 close;
+
+acc_mean_sub_n_trl = permute(mean(r.acc(:,:,:),1),[3 2 1]);
+%--------------save
+save(fullfile(path_saving,sprintf('acc_mean_sub_n_trl.mat')),...
+    'acc_mean_sub_n_trl');
 %-------------------------------------------------------------------------%
 
 %-----------------averge of accuracies with nd trials---------------------%
 acc_mean_n_trl = permute(mean(mean(r.acc(:,:,:),1),2),[3 2 1]);
-
-%--------------save
-save(fullfile(path_saving,sprintf('acc_mean_n_trl.mat')),...
-    'acc_mean_n_trl');
 
 % plot of that acc
 figure;
@@ -269,6 +246,10 @@ bar(acc_mean_n_trl)
 %--------------save fig
 savefig(gcf,fullfile(path_saving,sprintf('acc_mean_n_trl.fig')))
 close;
+
+%--------------save
+save(fullfile(path_saving,sprintf('acc_mean_n_trl.mat')),...
+    'acc_mean_n_trl');
 %-------------------------------------------------------------------------%
 
 
@@ -291,6 +272,7 @@ for n_train = 1 : N_train
     % compute confusion
     [~,mat_conf,idx_of_samps_with_ith_target,~] = ...
         confusion(target_tmp,output_tmp);
+    
     % plot of that acc
     figure;
     plotConfMat(mat_conf, names_word2classfy)
