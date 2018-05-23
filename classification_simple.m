@@ -21,15 +21,17 @@ name_DB_process = 'DB_processed';
 name_DB_analy = 'feat_set_DB_raw_n_sub_2_n_seg_15_n_wininc_204_winsize_204';
 
 % name of feature to be loaded
-name_feat_file = 'feat_set_11121314151617_RMS';
+name_feat_file = 'feat_set_12910_RMS';
 
 % decide indices of words to classify
 % names_words2use = ["Silence";"Home";"Back";"Recents";"Volume";"Brightness";...
 %     "Settings";"Wifi";"Bluetooth";"Vibrate";"Sound";"up";"down";"left";...
 %     "right";"Alarms";"Timers";"Music";"Navigate";"Ok Google";"Hey Siri"];
-names_words2use = ["Home";"Back";"Recents";"Volume";...
-    "Wifi";"Bluetooth";"Vibrate";"Sound";"up";"down";"left";...
-    "right";"Alarms";"Navigate";"Ok Google"];
+names_words2use = ["Home";"Back";"Volume";...
+    "Settings";"Wifi";"Vibrate";"Sound";"up";"down";"left";...
+    "right";"Alarms";"Timers";"Navigate";"Ok Google"];
+% names_words2use = ["Home";"Back";"up";"down";"left";...
+%     "right"];
 %-------------------------------------------------------------------------%
 
 %-------------set paths in compliance with Cha's code structure-----------%
@@ -72,8 +74,12 @@ names_words = ["Silence";"Home";"Back";"Recents";"Volume";"Brightness";...
 
 % indices of words 2 classify
 idx_word2classfy = find(contains(names_words,names_words2use)==1);
+idx_word2classfy(3) = [];
+
 n_word2classfy = length(idx_word2classfy);
 names_word2classfy = names_words(idx_word2classfy);
+disp(names_word2classfy);
+
 %-------------------------------------------------------------------------%
 
 %-------------------------------- paramters-------------------------------%
@@ -104,12 +110,13 @@ n_maxEpochs = 100;
 % n_miniBatchSize = 27;
 
 options = trainingOptions('adam', ...
-    'ExecutionEnvironment','gpu', ...
     'GradientThreshold',1, ...
     'MaxEpochs',n_maxEpochs, ...
     'SequenceLength','longest', ...
     'Shuffle','never', ...
     'Verbose',1);
+%     'ExecutionEnvironment','gpu', ...
+
 % , ...
 %     'Plots','training-progress');
 %-------------------------------------------------------------------------%
@@ -139,7 +146,7 @@ r.net= cell(n_trl,n_sub,N_train);
 % get accrucies and output/target (for confusion matrix) with respect to
 % subject, trial, number of segment, FE,
 for i_sub = 1 : n_sub
-    for n_train = 1: N_train
+    for n_train = N_train
         for i_trl = 1 : n_trl
             % get indices of trial for training set
             idx_trl_tr = idx_pair_set{n_train}(i_trl,:);
@@ -225,6 +232,9 @@ save(fullfile(path_saving,sprintf('r.mat')),'r');
 %-------------------------------------------------------------------------%
 
 %--------------averge of accuracies with subjects and trials--------------%
+acc_mean_sub_n_trl = permute(mean(mean(r.acc,1),2),[3 2 1]);
+
+
 % plot of that acc
 bar(acc_mean_sub_n_trl)
 %--------------save fig
@@ -254,7 +264,7 @@ save(fullfile(path_saving,sprintf('acc_mean_n_trl.mat')),...
 
 
 %---------------------confusion matrix -----------------------------------%
-for n_train = 1 : N_train
+for n_train = N_train
     tmp = r.output_n_target(:,:,n_train);
     tmp = cat(1,tmp{:});
     % categorical 2 double

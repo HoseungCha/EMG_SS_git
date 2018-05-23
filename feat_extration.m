@@ -288,6 +288,8 @@ for i_sub = 1 : n_sub
         tmp = get(gca,'YLim');
         stem(1:n_seg:n_seg*n_word,repmat(tmp(1),[n_word,1]),'r','LineWidth',1);
         stem(1:n_seg:n_seg*n_word,repmat(tmp(2),[n_word,1]),'r','LineWidth',1);
+        set(gca,'XTick',1:n_seg:n_seg*n_word);
+        set(gca,'XTickLabel',name_word);
         drawnow;
         %-----------------------------------------------------------------%
     end
